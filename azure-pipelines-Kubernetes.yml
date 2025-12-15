@@ -1,0 +1,95 @@
+# Node.js 
+# Build a general Node.js project with npm.
+
+trigger:
+  - 'grc_new_UI'
+
+pool:
+  name: Azure Pipelines
+
+variables:
+  imageRepository: 'grc/rakshitah-admin'
+  containerRegistry: 'registry.utho.io'
+  dockerfilePath: '$(Build.SourcesDirectory)/dockerfile'
+  tag: '$(Build.BuildId)'
+  uisource: 'src'
+  uibuild: '$(uisource)/build'
+  PROJECT_NAME: 'grc-admin-app'
+  SONARQUBE_PROJECT_KEY: 'GRC-Java_grc-admin-app_63193493-dac9-4a13-9690-f1327b2ab856'
+  SONARQUBE_URL: 'http://150.241.247.134:9000'
+  trivyVersion: 0.9.1
+
+stages:
+  - stage: Build
+    displayName: Build Stage
+    jobs:
+      - job: Build
+        displayName: Build Job
+        pool:
+          name: Azure Pipelines
+        steps:
+          - task: NodeTool@0
+            inputs:
+              versionSpec: '20.x'
+            displayName: 'Install Node.js'
+
+          - script: |
+              npm install
+              npm run build
+            displayName: 'npm install and Build'
+
+          - script: |
+              npm install -g sonarqube-scanner
+            displayName: 'Install SonarQube Scanner'
+
+          - script: |
+              sonar-scanner \
+                -Dsonar.projectName=$(PROJECT_NAME) \
+                -Dsonar.projectKey=$(SONARQUBE_PROJECT_KEY) \
+                -Dsonar.sources=. \
+                -Dsonar.host.url=$(SONARQUBE_URL) \
+                -Dsonar.token=$(SONARQUBE_TOKEN)
+            displayName: 'Run SonarQube Analysis'
+            env:
+              SONARQUBE_TOKEN: $(SONARQUBE_TOKEN)
+
+          - script: |
+              echo "$(UTHO_REGISTRY_PASSWORD)" | docker login registry.utho.io -u "$(UTHO_REGISTRY_USERNAME)" --password-stdin
+            displayName: 'Authenticate with Utho Cloud Container Registry'
+
+          - script: |
+              docker build -t registry.utho.io/$(imageRepository):$(tag) -f $(dockerfilePath) $(Build.SourcesDirectory)
+            displayName: 'Build Docker Image'
+
+          - script: |
+              docker push registry.utho.io/$(imageRepository):$(tag)
+            displayName: 'Push Docker Image to Utho Cloud'
+
+          - script: |
+              docker logout registry.utho.io
+              rm -f ~/.docker/config.json
+            displayName: 'Logout and Remove Docker Credentials'
+
+  - stage: Deploy
+    displayName: Deploy on K8 Cluster
+    dependsOn:
+      - Build
+    jobs:
+      - job: Deploy
+        displayName: Deploy on K8 Cluster
+        pool:
+          name: Azure Pipelines
+        steps:
+          - script: |
+              chmod +x changeversion.sh
+              ./changeversion.sh $(tag)
+            displayName: 'Updating Build Tag'
+
+          - task: KubernetesManifest@1
+            inputs:
+              action: 'deploy'
+              connectionType: 'kubernetesServiceConnection'
+              kubernetesServiceConnection: 'Utho Kubernates Integration'
+              namespace: default
+              manifests: 'admin-deploy.yml'
+            displayName: 'Deploying the admin container'

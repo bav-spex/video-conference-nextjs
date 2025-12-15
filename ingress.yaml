@@ -1,0 +1,60 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata: 
+  name: rakshitah-ingress
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod  # Let's Encrypt Issuer
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"  # Force HTTPS
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"  # Force SSL for all paths
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - p-lb-inmumbaizone2-264024-1636308.lb.onutho.com
+      secretName: letsencrypt-prod-private-key  # This matches your ClusterIssuer
+  rules:
+    - host: p-lb-inmumbaizone2-264024-1636308.lb.onutho.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: rakshitah-admin-service
+                port:
+                  number: 80
+          - path: /iac
+            pathType: Prefix
+            backend:
+              service:
+                name: rakshitah-iac-service
+                port:
+                  number: 5000
+          - path: /common
+            pathType: Prefix
+            backend:
+              service:
+                name: rakshitah-common-service
+                port:
+                  number: 80
+          - path: /gov
+            pathType: Prefix
+            backend:
+              service:
+                name: rakshitah-governance-service
+                port:
+                  number: 80
+          - path: /comp
+            pathType: Prefix
+            backend:
+              service:
+                name: rakshitah-compliance-service
+                port:
+                  number: 80
+          - path: /risk
+            pathType: Prefix
+            backend:
+              service:
+                name: rakshitah-risk-service
+                port:
+                  number: 80

@@ -1,0 +1,21 @@
+const riskDevRakshitah_base_url = process.env.NEXT_PUBLIC_riskDevRakshitah_base_url
+const commonDevRakshitah_base_url = process.env.NEXT_PUBLIC_commonDevRakshitah_base_url
+
+const commonCategoriesDevRakshitah_base_url = process.env.NEXT_PUBLIC_commonCategoriesDevRakshitah_base_url
+const governanceDevRakshitah_base_url = process.env.NEXT_PUBLIC_governanceDevRakshitah_base_url
+const authDevRakshitah_base_url = process.env.NEXT_PUBLIC_authDevRakshitah_base_url
+const complianceDevRakshitah_base_url = process.env.NEXT_PUBLIC_complianceDevRakshitah_base_url
+const storageTokenKeyName = process.env.NEXT_PUBLIC_storageTokenKeyName
+const onTokenExpiration = process.env.NEXT_PUBLIC_onTokenExpiration
+
+export default {
+  riskDevRakshitah_base_url: riskDevRakshitah_base_url,
+  commonDevRakshitah_base_url: commonDevRakshitah_base_url,
+  commonCategoriesDevRakshitah_base_url: commonCategoriesDevRakshitah_base_url,
+  governanceDevRakshitah_base_url: governanceDevRakshitah_base_url,
+  authDevRakshitah_base_url: authDevRakshitah_base_url,
+  complianceDevRakshitah_base_url: complianceDevRakshitah_base_url,
+
+  storageTokenKeyName: storageTokenKeyName,
+  onTokenExpiration: onTokenExpiration
+}

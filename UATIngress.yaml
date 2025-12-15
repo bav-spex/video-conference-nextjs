@@ -1,0 +1,62 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: rakshitah-uat-ingress
+  namespace: uat
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod  # Let's Encrypt Issuer
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"   # Force HTTPS
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"  # Force SSL for all paths
+    nginx.ingress.kubernetes.io/proxy-buffering: "off"  # Helps prevent caching issues
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - p-lb-inmumbaizone2-264024-1636308.lb.onutho.com  
+      secretName: letsencrypt-prod-private-key
+  rules:
+    - host: p-lb-inmumbaizone2-264024-1636308.lb.onutho.com
+      http:
+        paths:
+          - path: /uat
+            pathType: Prefix
+            backend:
+              service:
+                name: rakshitah-admin-uat-service
+                port:
+                  number: 80
+          - path: /iacuat 
+            pathType: Prefix
+            backend:
+              service:
+                name: rakshitah-iac-uat-service
+                port:
+                  number: 80
+          - path: /compuat
+            pathType: Prefix
+            backend:
+              service:
+                name: rakshitah-compliance-uat-service
+                port:
+                  number: 80
+          - path: /govuat
+            pathType: Prefix
+            backend:
+              service:
+                name: rakshitah-governance-uat-service
+                port:
+                  number: 80
+          - path: /commonuat
+            pathType: Prefix
+            backend:
+              service:
+                name: rakshitah-common-uat-service
+                port:
+                  number: 80
+          - path: /riskuat
+            pathType: Prefix
+            backend:
+              service:
+                name: rakshitah-risk-uat-service
+                port:
+                  number: 80

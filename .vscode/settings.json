@@ -1,0 +1,8 @@
+{
+    "javascript.format.enable": true,
+    "javascript.format.insertSpaceAfterCommaDelimiter": true,
+    "javascript.format.insertSpaceAfterConstructor": true,
+    "javascript.format.insertSpaceAfterFunctionKeywordForAnonymousFunctions": false,
+    "javascript.format.insertSpaceAfterOpeningAndBeforeClosingJsxExpressionBraces": true,
+    "javascript.autoClosingTags": true
+}

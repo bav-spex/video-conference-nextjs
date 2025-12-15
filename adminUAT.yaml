@@ -1,0 +1,55 @@
+apiVersion: apps/v1 
+kind: Deployment
+metadata:
+  name: rakshitah-admin-uat-deployment
+  namespace: uat 
+  labels:
+    app: rakshitah-admin-uat
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: rakshitah-admin-uat
+  template:
+    metadata:
+      labels:
+        app: rakshitah-admin-uat
+    spec:
+      nodeSelector:
+        node-role: rakshitah-uat
+      imagePullSecrets:
+        - name: "secret"
+      containers:
+        - name: rakshitah-admin
+          image: "registry.utho.io/grc/rakshitah-admin-uat:tagVersion"
+          ports:
+            - containerPort: 3001 
+          imagePullPolicy: "IfNotPresent"
+          resources:
+            requests:
+              cpu: "250m"
+              memory: "512Mi"
+            limits:
+              cpu: "1"
+              memory: "2Gi"
+          env:
+            - name: HOST
+              value: "0.0.0.0"
+  #        livenessProbe:
+  #          tcpSocket:
+  #            port: 3001  
+  #          initialDelaySeconds: 5
+  #          periodSeconds: 10
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: rakshitah-admin-uat-service  
+spec:
+  selector:
+    app: rakshitah-admin-uat
+  ports:
+    - protocol: TCP
+      port: 80  # Ingress will route traffic here
+      targetPort: 3001  
+  type: ClusterIP
