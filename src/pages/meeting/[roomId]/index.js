@@ -32,9 +32,12 @@ const Meeting = () => {
   const recvTransportRef = useRef(null)
 
   // local media
+  const videoTrackRef = useRef(null)
+  const audioTrackRef = useRef(null)
   const [localStream, setLocalStream] = useState(null)
   const videoProducerRef = useRef(null)
   const audioProducerRef = useRef(null)
+  const [cameraOn, setCameraOn] = useState(false)
   const [micMuted, setMicMuted] = useState(false)
 
   // remote media (tiles)
@@ -268,48 +271,52 @@ const Meeting = () => {
   // ---------- local media ----------
   async function startCamera() {
     try {
+      // get ONLY video if mic already exists
       const stream = await navigator.mediaDevices.getUserMedia({
         video: true,
-        audio: true
+        audio: !audioTrackRef.current // only request audio if not already active
       })
-
-      setLocalStream(stream)
-
-      if (localVideoRef.current) {
-        localVideoRef.current.srcObject = stream
-        localVideoRef.current.muted = true
-      }
 
       const videoTrack = stream.getVideoTracks()[0]
       const audioTrack = stream.getAudioTracks()[0]
 
-      // --- VIDEO PRODUCER ---
+      // ---------- VIDEO ----------
+      videoTrackRef.current = videoTrack
+      setLocalStream(new MediaStream([videoTrack, ...(audioTrack ? [audioTrack] : [])]))
+
+      if (localVideoRef.current) {
+        localVideoRef.current.srcObject = new MediaStream([videoTrack])
+        localVideoRef.current.muted = true
+      }
+
       if (videoProducerRef.current) {
-        // REUSE old producer → replace track
         await videoProducerRef.current.replaceTrack({ track: videoTrack })
       } else {
-        // create 1st producer
-        const vp = await sendTransportRef.current.produce({
+        videoProducerRef.current = await sendTransportRef.current.produce({
           track: videoTrack
         })
-        videoProducerRef.current = vp
       }
 
-      // --- AUDIO PRODUCER ---
-      if (audioProducerRef.current) {
-        await audioProducerRef.current.replaceTrack({ track: audioTrack })
-      } else {
-        const ap = await sendTransportRef.current.produce({
-          track: audioTrack,
-          appData: { mediaType: 'audio' }
-        })
-        audioProducerRef.current = ap
-      }
+      // ---------- AUDIO ----------
+      if (audioTrack) {
+        audioTrackRef.current = audioTrack
 
-      setMicMuted(false)
-      toast.success('Camera started (reused producer)')
+        if (audioProducerRef.current) {
+          await audioProducerRef.current.replaceTrack({ track: audioTrack })
+        } else {
+          audioProducerRef.current = await sendTransportRef.current.produce({
+            track: audioTrack,
+            appData: { mediaType: 'audio' }
+          })
+        }
+
+        setMicMuted(false)
+      }
+      setCameraOn(true)
+      toast.success('Camera started')
     } catch (err) {
-      console.error('startCamera error', err)
+      console.error(err)
+      setCameraOn(false)
       toast.error('Failed to start camera')
     }
   }
@@ -338,31 +345,43 @@ const Meeting = () => {
   }
 
   function stopCamera() {
-    cleanupLocalMedia()
-    toast.success('Camera stopped')
-    if (socket) {
-      socket.emit('getProducers', { roomId }, ({ producers }) => {
-        console.log('producers===>', producers)
-        if (Array.isArray(producers)) setProducers(producers)
-      })
+    // stop ONLY video track
+    if (videoTrackRef.current) {
+      videoTrackRef.current.stop()
+      videoTrackRef.current = null
     }
+
+    // detach video from producer (producer stays alive)
+    if (videoProducerRef.current) {
+      videoProducerRef.current.replaceTrack({ track: null })
+    }
+
+    // update local preview
+    if (localVideoRef.current) {
+      localVideoRef.current.srcObject = null
+    }
+
+    // update localStream without touching audio
+    if (audioTrackRef.current) {
+      setLocalStream(new MediaStream([audioTrackRef.current]))
+    } else {
+      setLocalStream(null)
+    }
+    setCameraOn(false)
+    toast.success('Camera stopped (mic unaffected)')
   }
 
   function toggleMic() {
-    if (!localStream) {
-      toast.error('No local stream')
+    if (!audioTrackRef.current) {
+      toast.error('Mic not started')
 
       return
     }
-    const audioTrack = localStream.getAudioTracks()[0]
-    if (!audioTrack) {
-      toast.error('No audio track')
 
-      return
-    }
-    audioTrack.enabled = !audioTrack.enabled
-    setMicMuted(!audioTrack.enabled)
-    toast.success(audioTrack.enabled ? 'Mic unmuted' : 'Mute Mic')
+    audioTrackRef.current.enabled = !audioTrackRef.current.enabled
+    setMicMuted(!audioTrackRef.current.enabled)
+
+    toast.success(audioTrackRef.current.enabled ? 'Mic unmuted' : 'Mic muted')
   }
 
   // ---------- remote media / consumers ----------
@@ -597,7 +616,7 @@ const Meeting = () => {
               style={{ border: '1px solid #ccc', borderRadius: 4 }}
             />
             <div style={{ marginTop: 8 }}>
-              {!localStream ? (
+              {!cameraOn ? (
                 <Button onClick={startCamera} disabled={!sendTransportRef.current}>
                   Start Camera
                 </Button>
