@@ -12,11 +12,14 @@ const Index = () => {
   const theme = useTheme()
   const { user } = useAuth()
 
+  const login = JSON.parse(localStorage.getItem('login'))
+  console.log('login===>',login)
+
   useEffect(() => {
-    if (user && user.role) {
+    if (login && login === 'true') {
       router.replace('/dashboard') // logged-in users go here
     }
-  }, [user])
+  }, [login])
 
   return (
     <>

@@ -64,8 +64,8 @@ const AuthProvider = ({ children }) => {
           console.log(err)
           localStorage.removeItem('accessToken')
           setLoading(false)
-          // router.push('/login')
-          router.push('/dashboard')
+          router.push('/login')
+          // router.push('/dashboard')
         })
 
       // Make the GET request directly with axios
@@ -129,8 +129,8 @@ const AuthProvider = ({ children }) => {
           // router.push('/home/riskManagement/risks');
         })
     } else {
-      // router.push('/login')
-      router.push('/dashboard')
+      router.push('/login')
+      // router.push('/dashboard')
 
       localStorage.removeItem(authConfig.storageTokenKeyName)
       // setLoading(false)
@@ -205,8 +205,8 @@ const AuthProvider = ({ children }) => {
     setClaims(null)
     window.localStorage.removeItem('userData')
     window.localStorage.removeItem(authConfig.storageTokenKeyName)
-    // router.push('/login')
-    router.push('/dashboard')
+    router.push('/login')
+    // router.push('/dashboard')
   }
 
   const handleRegister = (params, errorCallback) => {

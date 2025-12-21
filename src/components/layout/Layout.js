@@ -36,7 +36,8 @@ const Layout = ({ children }) => {
     })
   }, [])
 
-  const byPassLogin = true
+  const login = JSON.parse(localStorage.getItem('login'))
+  console.log('login====>', login)
 
   return (
     <Box
@@ -47,7 +48,7 @@ const Layout = ({ children }) => {
       overflow={'hidden'}
       dir={language === 'ar' || language === 'il' ? 'rtl' : 'ltr'}
     >
-      {byPassLogin ? (
+      {login === 'true' ? (
         <>
           <SideDrawer isStick={isStick} setIsStick={setIsStick} />
           <Box

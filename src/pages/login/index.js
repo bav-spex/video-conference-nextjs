@@ -78,17 +78,29 @@ const LoginPage = () => {
   const onSubmit = data => {
     setSubmitting(true)
 
-    const authParams = {
-      username: data.username,
-      password: data.password,
-      rememberMe
-    }
+    // const authParams = {
+    //   username: data.username,
+    //   password: data.password,
+    //   rememberMe
+    // }
 
-    auth.login(authParams, ({ field, message }) => {
-      setSubmitting(false)
-      setLoginError('Invalid Credentials, Try again')
-    })
+    localStorage.setItem('login', JSON.stringify('true'))
+    router.push('/dashboard')
+
+    // auth.login(authParams, ({ field, message }) => {
+    //   setSubmitting(false)
+    //   setLoginError('Invalid Credentials, Try again')
+    // })
   }
+
+  const login = JSON.parse(localStorage.getItem('login'))
+  console.log('login====>', login)
+
+  useEffect(() => {
+    if (login && login === 'true') {
+      router.push('/dashboard')
+    }
+  }, [login])
 
   const handleLoginViaAzureAD = async e => {
     e.preventDefault()
@@ -115,8 +127,8 @@ const LoginPage = () => {
           localStorage.removeItem('userData')
           localStorage.removeItem('refreshToken')
           if (authConfig.onTokenExpiration === 'logout' && !router.pathname.includes('login')) {
-            // router.push('/login')
-            router.push('/dashboard')
+            router.push('/login')
+            // router.push('/dashboard')
           }
         })
     }

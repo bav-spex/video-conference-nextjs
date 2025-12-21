@@ -25,6 +25,7 @@ export default function ProfilePopover() {
 
   const handleClick = link => {
     if (link === 'logout') {
+      localStorage.clear()
       logout()
       handleClose()
     } else {
@@ -32,11 +33,13 @@ export default function ProfilePopover() {
       handleClose()
     }
   }
+  const login = JSON.parse(localStorage.getItem('login'))
+  console.log('login====>', login)
 
   return (
     <>
       {/* Avatar  to trigger popover */}
-      {user && (
+      {login && login === 'true' && (
         <>
           <Avatar
             sx={{
@@ -49,7 +52,8 @@ export default function ProfilePopover() {
             }}
             onClick={handleOpen}
           >
-            {user?.firstName?.charAt(0).toUpperCase() ?? user?.userName?.charAt(0).toUpperCase() ?? 'U'}
+          A
+            {/* {user?.firstName?.charAt(0).toUpperCase() ?? user?.userName?.charAt(0).toUpperCase() ?? 'U'} */}
           </Avatar>
 
           <Popover
@@ -75,12 +79,13 @@ export default function ProfilePopover() {
             {/* User Info */}
             <Box sx={{ padding: { xs: '10px 16px', md: '15px 24px' } }}>
               <Typography sx={{ fontSize: '1.2rem', fontWeight: 500, mb: '5px', color: theme.palette.company.text }}>
-                {user?.userName[0].toUpperCase() + user.userName.slice(1)}
+                A
+                {/* {user?.userName[0].toUpperCase() + user.userName.slice(1)} */}
               </Typography>
-              <Typography sx={{ fontSize: 13, color: '#666' }}>
+              {/* <Typography sx={{ fontSize: 13, color: '#666' }}>
                 {' '}
                 {user?.role[0].toUpperCase() + user.role.slice(1)}
-              </Typography>
+              </Typography> */}
             </Box>
 
             <Divider />
@@ -88,7 +93,7 @@ export default function ProfilePopover() {
             {/* Menu Items */}
             <Box sx={{ padding: '12px' }}>
               {[
-                { title: 'Profile', link: '/profile' },
+                // { title: 'Profile', link: '/profile' },
                 {
                   title: 'Logout',
                   link: 'logout'
