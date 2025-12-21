@@ -50,6 +50,12 @@ const Meeting = () => {
   const [producers, setProducers] = useState([]) // {producerId, owner}
   const [broadcastSet, setBroadcastSet] = useState(new Set())
 
+  // To Highlight ActiveSpeaker
+  const [activeSpeakerClientId, setActiveSpeakerClientId] = useState(null)
+  const audioAnalyserRef = useRef(new Map()) // producerId -> { analyser, dataArray }
+  const audioProducerOwnerRef = useRef(new Map()) // audioProducerId -> ownerClientId
+  const audioContextRef = useRef(new Set())
+
   // identity / role
   const [clientInfo] = useState(() => {
     let clientId = sessionStorage.getItem('clientId')
@@ -204,6 +210,42 @@ const Meeting = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [roomId])
 
+  // ---------- Active speaker detection loop ----------
+  useEffect(() => {
+    const interval = setInterval(() => {
+      let loudestClientId = null
+      let maxVolume = 0
+
+      audioAnalyserRef.current.forEach((entry, producerId) => {
+        const { analyser, dataArray } = entry
+        analyser.getByteFrequencyData(dataArray)
+
+        const volume = dataArray.reduce((a, b) => a + b, 0) / dataArray.length
+
+        if (volume > maxVolume && volume > 20) {
+          maxVolume = volume
+          loudestClientId = audioProducerOwnerRef.current.get(producerId)
+        }
+      })
+
+      setActiveSpeakerClientId(loudestClientId)
+    }, 300)
+
+    return () => clearInterval(interval)
+  }, [])
+
+  // ---------- Resume on first click anywhere -------------
+  useEffect(() => {
+    const resume = () => resumeAllAudioContexts()
+    window.addEventListener('click', resume)
+    window.addEventListener('keydown', resume)
+
+    return () => {
+      window.removeEventListener('click', resume)
+      window.removeEventListener('keydown', resume)
+    }
+  }, [])
+
   // ---------- mediasoup setup ----------
   async function setupMediasoup(routerRtpCapabilities, s) {
     const device = new mediasoupClient.Device()
@@ -271,6 +313,8 @@ const Meeting = () => {
   // ---------- local media ----------
   async function startCamera() {
     try {
+      resumeAllAudioContexts()
+
       // get ONLY video if mic already exists
       const stream = await navigator.mediaDevices.getUserMedia({
         video: true,
@@ -372,6 +416,7 @@ const Meeting = () => {
   }
 
   function toggleMic() {
+    resumeAllAudioContexts()
     if (!audioTrackRef.current) {
       toast.error('Mic not started')
 
@@ -441,6 +486,14 @@ const Meeting = () => {
     })
   }
 
+  function resumeAllAudioContexts() {
+    audioContextRef.current.forEach(ctx => {
+      if (ctx.state === 'suspended') {
+        ctx.resume().catch(() => {})
+      }
+    })
+  }
+
   function consumeProducer(producerId, ownerClientId, s = socket) {
     const device = deviceRef.current
     const recvTransport = recvTransportRef.current
@@ -488,17 +541,42 @@ const Meeting = () => {
           const stream = new MediaStream()
           stream.addTrack(consumer.track)
 
+          audioProducerOwnerRef.current.set(producerId, ownerClientId)
+
           if (res.kind === 'audio') {
-            // audio-only, play in background
             const audioEl = new Audio()
             audioEl.srcObject = stream
+            audioEl.autoplay = true
+            audioEl.playsInline = true
             audioEl.play().catch(() => {})
+
+            // 🔊 ACTIVE SPEAKER ANALYSIS
+            const audioCtx = new (window.AudioContext || window.webkitAudioContext)()
+
+            // 🔑 IMPORTANT: try to resume immediately
+            if (audioCtx.state === 'suspended') {
+              audioCtx.resume().catch(() => {})
+            }
+
+            audioContextRef.current.add(audioCtx)
+            const source = audioCtx.createMediaStreamSource(stream)
+            const analyser = audioCtx.createAnalyser()
+
+            analyser.fftSize = 256
+            const dataArray = new Uint8Array(analyser.frequencyBinCount)
+
+            source.connect(analyser)
+
+            audioAnalyserRef.current.set(producerId, { analyser, dataArray })
+
             setLoadingProducers(prev => {
               const copy = new Set(prev)
               copy.delete(producerId)
 
               return copy
             })
+
+            return
           } else {
             // video: put in grid
             setRemoteMedia(prev => {
@@ -580,6 +658,7 @@ const Meeting = () => {
             disabled={leavingRef.current}
             onClick={() => {
               if (leavingRef.current) return
+              resumeAllAudioContexts()
               leavingRef.current = true
 
               socket?.emit('leave', { roomId }, () => {
@@ -648,7 +727,9 @@ const Meeting = () => {
                     maxWidth: 'calc(33% - 12px)',
                     minWidth: 240,
                     borderRadius: 4,
-                    overflow: 'hidden'
+                    overflow: 'hidden',
+                    border: activeSpeakerClientId === m.owner ? '3px solid #00c853' : '1px solid #ccc',
+                    boxShadow: activeSpeakerClientId === m.owner ? '0 0 12px rgba(0,200,83,0.7)' : 'none'
                   }}
                 >
                   <video
