@@ -321,8 +321,8 @@ const SideDrawerContent = ({ navItems, translate }) => {
             background: theme.palette.company.tertiary
           }}
         >
-          <Typography variant='body2'>Powered by</Typography>
-          <img alt='9USRcraftLogo' src='/images/9USRcraftLogo.png' />
+          {/* <Typography variant='body2'>Powered by</Typography> */}
+          {/* <img alt='9USRcraftLogo' src='/images/9USRcraftLogo.png' /> */}
         </Box>
       )}
     </>
