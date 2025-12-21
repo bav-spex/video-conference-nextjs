@@ -1,7 +1,17 @@
 // src/pages/CreateMeeting.jsx
-import React from 'react'
+import React, { useState } from 'react'
 
-import { Box, Button } from '@mui/material'
+import {
+  Box,
+  Button,
+  FormControl,
+  FormControlLabel,
+  FormLabel,
+  Radio,
+  RadioGroup,
+  TextField,
+  Typography
+} from '@mui/material'
 import Topbar from 'components/Topbar'
 import { useAppDispatch } from 'hooks/hooks'
 import { useRouter } from 'next/router'
@@ -12,6 +22,11 @@ import { v4 as uuidv4 } from 'uuid'
 const CreateMeeting = () => {
   const router = useRouter()
   const dispatch = useAppDispatch()
+  const [mediaType, setMediaType] = useState('audio-video')
+
+  const handleChange = event => {
+    setMediaType(event.target.value)
+  }
 
   const createRoom = () => {
     const roomId = uuidv4().slice(0, 8)
@@ -29,10 +44,59 @@ const CreateMeeting = () => {
   return (
     <>
       <Topbar />
-      <Box className={'displayAreaBlock scrollDiv'} sx={{ padding: { xs: '16px 16px 78px', md: '30px' } }}>
-        <Button onClick={createRoom} style={{ padding: '10px 20px' }}>
-          Create New Meeting as Host
-        </Button>
+
+      <Box
+        className='displayAreaBlock scrollDiv'
+        sx={{
+          minHeight: 'calc(100vh - 64px)',
+          display: 'flex',
+          alignItems: 'flex-start',
+          justifyContent: 'center',
+          px: { xs: 2, md: 4 },
+          pt: '200px',
+          width: '100%'
+        }}
+      >
+        <Box
+          sx={{
+            width: '100%',
+            maxWidth: 420,
+            bgcolor: 'background.paper',
+            borderRadius: 2,
+            boxShadow: 3,
+            p: 4
+          }}
+        >
+          {/* Heading */}
+          <Box mb={3} textAlign='center'>
+            <Typography variant='h6' fontWeight={600}>
+              Create Meeting
+            </Typography>
+          </Box>
+
+          <FormControl sx={{ mb: 3 }}>
+            <FormLabel sx={{ mb: 1 }}>Media Type</FormLabel>
+            <RadioGroup value={mediaType} onChange={handleChange}>
+              <FormControlLabel value='video' control={<Radio />} label='🎥 Video Only' />
+              <FormControlLabel value='audio' control={<Radio />} label='🎧 Audio Only' />
+              <FormControlLabel value='audio-video' control={<Radio />} label='🎥 + 🎧 Audio & Video' />
+            </RadioGroup>
+          </FormControl>
+
+          {/* Join Button */}
+          <Button
+            fullWidth
+            size='large'
+            variant='contained'
+            onClick={createRoom}
+            sx={{
+              height: 48,
+              fontWeight: 600
+            }}
+          >
+            Create New Meeting as Host
+          </Button>
+        </Box>
       </Box>
     </>
   )
