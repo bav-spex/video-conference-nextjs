@@ -4,11 +4,6 @@ import React, { useState } from 'react'
 import {
   Box,
   Button,
-  FormControl,
-  FormControlLabel,
-  FormLabel,
-  Radio,
-  RadioGroup,
   TextField,
   Typography
 } from '@mui/material'
@@ -22,19 +17,23 @@ import { v4 as uuidv4 } from 'uuid'
 const CreateMeeting = () => {
   const router = useRouter()
   const dispatch = useAppDispatch()
-  const [mediaType, setMediaType] = useState('audio-video')
 
-  const handleChange = event => {
-    setMediaType(event.target.value)
-  }
+  const [name, setName] = useState('')
 
   const createRoom = () => {
+    if (!name.trim()) {
+      toast.error('Please enter your name')
+      
+      return
+    }
+
     const roomId = uuidv4().slice(0, 8)
 
-    // Set host identity
+    // Persist host identity
     sessionStorage.setItem('role', 'host')
     sessionStorage.setItem('clientId', uuidv4())
-    sessionStorage.setItem('displayName', 'Host-' + Math.random().toString(36).substring(2, 6))
+    sessionStorage.setItem('displayName', name.trim())
+    sessionStorage.setItem('mediaType', 'audio-video') // host default
 
     toast.success('Meeting created')
     dispatch(markUI({ isMeetingStarted: true }))
@@ -72,23 +71,28 @@ const CreateMeeting = () => {
             <Typography variant='h6' fontWeight={600}>
               Create Meeting
             </Typography>
+            <Typography variant='body2' color='text.secondary'>
+              Enter your name to start the meeting
+            </Typography>
           </Box>
 
-          <FormControl sx={{ mb: 3 }}>
-            <FormLabel sx={{ mb: 1 }}>Media Type</FormLabel>
-            <RadioGroup value={mediaType} onChange={handleChange}>
-              <FormControlLabel value='video' control={<Radio />} label='🎥 Video Only' />
-              <FormControlLabel value='audio' control={<Radio />} label='🎧 Audio Only' />
-              <FormControlLabel value='audio-video' control={<Radio />} label='🎥 + 🎧 Audio & Video' />
-            </RadioGroup>
-          </FormControl>
+          {/* Name */}
+          <TextField
+            fullWidth
+            label='Your Name'
+            placeholder='Enter your name'
+            value={name}
+            onChange={e => setName(e.target.value)}
+            sx={{ mb: 3 }}
+          />
 
-          {/* Join Button */}
+          {/* Create Button */}
           <Button
             fullWidth
             size='large'
             variant='contained'
             onClick={createRoom}
+            disabled={!name}
             sx={{
               height: 48,
               fontWeight: 600

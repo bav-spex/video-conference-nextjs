@@ -37,7 +37,7 @@ const Layout = ({ children }) => {
   }, [])
 
   const login = JSON.parse(localStorage.getItem('login'))
-  console.log('login====>', login)
+
 
   return (
     <Box

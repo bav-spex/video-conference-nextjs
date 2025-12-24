@@ -94,7 +94,7 @@ const LoginPage = () => {
   }
 
   const login = JSON.parse(localStorage.getItem('login'))
-  console.log('login====>', login)
+
 
   useEffect(() => {
     if (login && login === 'true') {

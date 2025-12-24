@@ -22,10 +22,12 @@ import { v4 as uuidv4 } from 'uuid'
 const JoinMeeting = () => {
   const router = useRouter()
   const dispatch = useAppDispatch()
+
   const [roomId, setRoomId] = useState('')
+  const [name, setName] = useState('')
   const [mediaType, setMediaType] = useState('audio-video')
 
-  const handleChange = event => {
+  const handleMediaChange = event => {
     setMediaType(event.target.value)
   }
 
@@ -36,10 +38,17 @@ const JoinMeeting = () => {
       return
     }
 
-    // Configure attendee identity
+    if (!name.trim()) {
+      toast.error('Please enter your name')
+      
+      return
+    }
+
+    // Persist attendee identity
     sessionStorage.setItem('role', 'attendee')
     sessionStorage.setItem('clientId', uuidv4())
-    sessionStorage.setItem('displayName', 'User-' + Math.random().toString(36).substring(2, 6))
+    sessionStorage.setItem('displayName', name.trim())
+    sessionStorage.setItem('mediaType', mediaType)
 
     toast.success('Joining meeting...')
     dispatch(markUI({ isMeetingStarted: true }))
@@ -58,7 +67,7 @@ const JoinMeeting = () => {
           alignItems: 'flex-start',
           justifyContent: 'center',
           px: { xs: 2, md: 4 },
-          pt: "200px",
+          pt: '200px',
           width: '100%'
         }}
       >
@@ -78,9 +87,19 @@ const JoinMeeting = () => {
               Join Meeting
             </Typography>
             <Typography variant='body2' color='text.secondary'>
-              Enter room code and choose media type
+              Enter your name, room code, and media preference
             </Typography>
           </Box>
+
+          {/* Name */}
+          <TextField
+            fullWidth
+            label='Your Name'
+            placeholder='Enter your name'
+            value={name}
+            onChange={e => setName(e.target.value)}
+            sx={{ mb: 3 }}
+          />
 
           {/* Room Code */}
           <TextField
@@ -95,8 +114,7 @@ const JoinMeeting = () => {
           {/* Media Type */}
           <FormControl sx={{ mb: 3 }}>
             <FormLabel sx={{ mb: 1 }}>Media Type</FormLabel>
-            <RadioGroup value={mediaType} onChange={handleChange}>
-              <FormControlLabel value='video' control={<Radio />} label='🎥 Video Only' />
+            <RadioGroup value={mediaType} onChange={handleMediaChange}>
               <FormControlLabel value='audio' control={<Radio />} label='🎧 Audio Only' />
               <FormControlLabel value='audio-video' control={<Radio />} label='🎥 + 🎧 Audio & Video' />
             </RadioGroup>
@@ -108,7 +126,7 @@ const JoinMeeting = () => {
             size='large'
             variant='contained'
             onClick={joinRoom}
-            disabled={!roomId}
+            disabled={!roomId || !name}
             sx={{
               height: 48,
               fontWeight: 600
