@@ -805,7 +805,7 @@ const Meeting = () => {
           {/* Remote grid (entire container can go fullscreen) */}
           <div style={{ flex: 1, minWidth: 320 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-              <h4 style={{ margin: 0 }}>Remote Screen</h4>
+              <h4 style={{ margin: 0 }}>{isHost ? 'Live Participants' : 'Presenter Stream'}</h4>
 
               {/* Fullscreen toggle for entire remote screen container */}
               <Button
