@@ -1,17 +1,7 @@
 // src/pages/JoinMeeting.jsx
 import { useState } from 'react'
 
-import {
-  Box,
-  Button,
-  FormControl,
-  FormControlLabel,
-  FormLabel,
-  Radio,
-  RadioGroup,
-  TextField,
-  Typography
-} from '@mui/material'
+import { Box, Button, TextField, Typography } from '@mui/material'
 import Topbar from 'components/Topbar'
 import { useAppDispatch } from 'hooks/hooks'
 import { useRouter } from 'next/router'
@@ -25,11 +15,6 @@ const JoinMeeting = () => {
 
   const [roomId, setRoomId] = useState('')
   const [name, setName] = useState('')
-  const [mediaType, setMediaType] = useState('audio-video')
-
-  const handleMediaChange = event => {
-    setMediaType(event.target.value)
-  }
 
   const joinRoom = () => {
     if (!roomId.trim()) {
@@ -40,7 +25,7 @@ const JoinMeeting = () => {
 
     if (!name.trim()) {
       toast.error('Please enter your name')
-      
+
       return
     }
 
@@ -48,7 +33,6 @@ const JoinMeeting = () => {
     sessionStorage.setItem('role', 'attendee')
     sessionStorage.setItem('clientId', uuidv4())
     sessionStorage.setItem('displayName', name.trim())
-    sessionStorage.setItem('mediaType', mediaType)
 
     toast.success('Joining meeting...')
     dispatch(markUI({ isMeetingStarted: true }))
@@ -110,15 +94,6 @@ const JoinMeeting = () => {
             onChange={e => setRoomId(e.target.value)}
             sx={{ mb: 3 }}
           />
-
-          {/* Media Type */}
-          <FormControl sx={{ mb: 3 }}>
-            <FormLabel sx={{ mb: 1 }}>Media Type</FormLabel>
-            <RadioGroup value={mediaType} onChange={handleMediaChange}>
-              <FormControlLabel value='audio' control={<Radio />} label='🎧 Audio Only' />
-              <FormControlLabel value='audio-video' control={<Radio />} label='🎥 + 🎧 Audio & Video' />
-            </RadioGroup>
-          </FormControl>
 
           {/* Join Button */}
           <Button

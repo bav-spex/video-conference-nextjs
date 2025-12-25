@@ -1,12 +1,7 @@
 // src/pages/CreateMeeting.jsx
 import React, { useState } from 'react'
 
-import {
-  Box,
-  Button,
-  TextField,
-  Typography
-} from '@mui/material'
+import { Box, Button, TextField, Typography } from '@mui/material'
 import Topbar from 'components/Topbar'
 import { useAppDispatch } from 'hooks/hooks'
 import { useRouter } from 'next/router'
@@ -23,7 +18,7 @@ const CreateMeeting = () => {
   const createRoom = () => {
     if (!name.trim()) {
       toast.error('Please enter your name')
-      
+
       return
     }
 
@@ -33,7 +28,6 @@ const CreateMeeting = () => {
     sessionStorage.setItem('role', 'host')
     sessionStorage.setItem('clientId', uuidv4())
     sessionStorage.setItem('displayName', name.trim())
-    sessionStorage.setItem('mediaType', 'audio-video') // host default
 
     toast.success('Meeting created')
     dispatch(markUI({ isMeetingStarted: true }))

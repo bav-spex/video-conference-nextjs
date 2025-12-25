@@ -1,3 +1,4 @@
+// src/pages/Meeting.jsx
 import React, { useEffect, useRef, useState } from 'react'
 
 import { Box, Button } from '@mui/material'
@@ -10,8 +11,10 @@ import io from 'socket.io-client'
 import { markUI } from 'store/ui/uiSlice'
 import { v4 as uuidv4 } from 'uuid'
 
-// const SERVER = "https://localhost:3000"; // your HTTPS mediasoup server
+import LocalPanel from './LocalPanel'
+import RemoteGrid from './RemoteGrid'
 
+// const SERVER = "https://localhost:3000"; // your HTTPS mediasoup server
 const SERVER = `https://${process.env.NEXT_PUBLIC_LOCAL_IPV4}:${process.env.NEXT_PUBLIC_BACKEND_PORT}` // your HTTPS mediasoup server
 
 const Meeting = () => {
@@ -260,13 +263,6 @@ const Meeting = () => {
   const remoteGridRef = useRef(null) // container ref for the whole Remote Screen
   const [isRemoteFullscreen, setIsRemoteFullscreen] = useState(false)
 
-  // Keep or create a peerNameMap if you haven't already:
-  useEffect(() => {
-    const map = new Map()
-    peers.forEach(p => map.set(p.clientId, p.displayName))
-    peerNameMap.current = map
-  }, [peers])
-
   // Fullscreen toggle for the whole remote-grid container
   function toggleRemoteFullscreen() {
     const el = remoteGridRef.current
@@ -403,8 +399,7 @@ const Meeting = () => {
           await audioProducerRef.current.replaceTrack({ track: audioTrack })
         } else {
           audioProducerRef.current = await sendTransportRef.current.produce({
-            track: audioTrack,
-            appData: { mediaType: 'audio' }
+            track: audioTrack
           })
         }
 
@@ -736,210 +731,37 @@ const Meeting = () => {
             flexWrap: 'wrap'
           }}
         >
-          {/* Local preview */}
-          <div style={{ minWidth: 320 }}>
-            <h4>Local</h4>
-            <video
-              ref={localVideoRef}
-              autoPlay
-              playsInline
-              muted
-              width={320}
-              height={240}
-              style={{ border: '1px solid #ccc', borderRadius: 4 }}
-            />
-            <div style={{ marginTop: 8 }}>
-              {!cameraOn ? (
-                <Button onClick={startCamera} disabled={!sendTransportRef.current}>
-                  Start Camera
-                </Button>
-              ) : (
-                <Button onClick={stopCamera}>Stop Camera</Button>
-              )}
-              <Button style={{ marginLeft: 8 }} onClick={toggleMic} disabled={!localStream}>
-                {micMuted ? 'Unmute Mic' : 'Mute Mic'}
-              </Button>
-            </div>
-            {/* Side panel (peers + info only, no broadcast Buttons now) */}
-            <Box sx={{ width: 260, minWidth: 220, mt: '50px' }}>
-              <h4>Peers</h4>
-              <ul>
-                {peers.map(p => (
-                  <li key={p.clientId}>
-                    {p.displayName} ({p.role}){p.clientId === clientInfo.clientId ? ' — You' : ''}
-                  </li>
-                ))}
-              </ul>
-
-              {/* <h4 style={{ marginTop: 12 }}>Producers (info)</h4> */}
-              <ul>
-                {producers.map(p => {
-                  {
-                    isHost
-                      ? console.log(
-                          `Owner: ${p.owner} - [${
-                            broadcastSet.has(p.producerId) ? 'Broadcasting' : 'Not broadcasting'
-                          }]`
-                        )
-                      : console.log(`Owner: ${p.owner} - [Auto-view]`)
-                  }
-
-                  return (
-                    <></>
-                    // <li key={p.producerId} style={{ marginBottom: 4 }}>
-                    //   Owner: {p.owner}
-                    //   {isHost ? (
-                    //     <span style={{ fontSize: 11, marginLeft: 4 }}>
-                    //       [{broadcastSet.has(p.producerId) ? 'Broadcasting' : 'Not broadcasting'}]
-                    //     </span>
-                    //   ) : (
-                    //     <span style={{ fontSize: 11, marginLeft: 4 }}>[Auto-view]</span>
-                    //   )}
-                    // </li>
-                  )
-                })}
-              </ul>
-            </Box>
-          </div>
+          {/* Local panel: preview, controls and peers */}
+          <LocalPanel
+            localVideoRef={localVideoRef}
+            cameraOn={cameraOn}
+            startCamera={startCamera}
+            stopCamera={stopCamera}
+            toggleMic={toggleMic}
+            micMuted={micMuted}
+            localStream={localStream}
+            peers={peers}
+            producers={producers}
+            clientInfo={clientInfo}
+            broadcastSet={broadcastSet}
+            isHost={isHost}
+          />
 
           {/* Remote grid (entire container can go fullscreen) */}
-          <div style={{ flex: 1, minWidth: 320 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-              <h4 style={{ margin: 0 }}>{isHost ? 'Live Participants' : 'Presenter Stream'}</h4>
-
-              {/* Fullscreen toggle for entire remote screen container */}
-              <Button
-                size='small'
-                onClick={toggleRemoteFullscreen}
-                style={{
-                  background: 'rgba(0,0,0,0.6)',
-                  color: 'white',
-                  minWidth: 'auto',
-                  padding: '6px 8px',
-                  fontSize: 13
-                }}
-              >
-                {isRemoteFullscreen ? 'Exit Fullscreen' : 'Fullscreen'}
-              </Button>
-            </div>
-
-            {/* container that will go fullscreen */}
-            <div
-              ref={remoteGridRef}
-              style={{
-                width: '100%',
-                // when in fullscreen, expand to viewport (browser handles it),
-                // but we keep the grid responsive using CSS grid below
-                display: 'grid',
-                gridTemplateColumns: `repeat(${getGridColumns(remoteMedia.length || 1)}, 1fr)`,
-                gap: 12,
-                alignItems: 'stretch'
-              }}
-            >
-              {remoteMedia.map(m => {
-                const isActive = activeSpeakerClientId === m.owner
-
-                return (
-                  <div
-                    key={m.producerId}
-                    style={{
-                      position: 'relative',
-                      borderRadius: 8,
-                      overflow: 'hidden',
-                      border: isActive ? '3px solid #00c853' : '1px solid #ccc',
-                      boxShadow: isActive ? '0 0 12px rgba(0,200,83,0.7)' : 'none',
-                      aspectRatio: '16/9',
-                      width: '100%',
-                      background: '#000'
-                    }}
-                  >
-                    <video
-                      autoPlay
-                      playsInline
-                      style={{
-                        width: '100%',
-                        height: '100%',
-                        objectFit: 'cover',
-                        display: 'block'
-                      }}
-                      ref={el => {
-                        if (el && m.stream && el.srcObject !== m.stream) {
-                          el.srcObject = m.stream
-                        }
-                      }}
-                    />
-
-                    {/* Owner label */}
-                    <div
-                      style={{
-                        position: 'absolute',
-                        bottom: 28,
-                        left: 8,
-                        padding: '4px 8px',
-                        background: 'rgba(0,0,0,0.6)',
-                        color: 'white',
-                        fontSize: 12,
-                        borderRadius: 4
-                      }}
-                    >
-                      {peerNameMap.current.get(m.owner) || 'Guest'}
-                    </div>
-
-                    {/* Host broadcast controls */}
-                    {isHost && (
-                      <div
-                        style={{
-                          position: 'absolute',
-                          bottom: 6,
-                          left: 0,
-                          width: '100%',
-                          display: 'flex',
-                          justifyContent: 'center',
-                          gap: 8,
-                          zIndex: 5
-                        }}
-                      >
-                        {broadcastSet.has(m.producerId) ? (
-                          <Button
-                            style={{ padding: '4px 10px', fontSize: 12 }}
-                            onClick={() => hostStopBroadcast(m.producerId)}
-                          >
-                            Stop Broadcast
-                          </Button>
-                        ) : (
-                          <Button
-                            style={{ padding: '4px 10px', fontSize: 12 }}
-                            onClick={() => hostBroadcast(m.producerId)}
-                          >
-                            Broadcast
-                          </Button>
-                        )}
-                      </div>
-                    )}
-
-                    {/* Loading overlay */}
-                    {loadingProducers.has(m.producerId) && (
-                      <div
-                        style={{
-                          position: 'absolute',
-                          inset: 0,
-                          background: 'rgba(0,0,0,0.35)',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          color: 'white',
-                          fontSize: 14,
-                          zIndex: 4
-                        }}
-                      >
-                        Loading...
-                      </div>
-                    )}
-                  </div>
-                )
-              })}
-            </div>
-          </div>
+          <RemoteGrid
+            remoteMedia={remoteMedia}
+            peerNameMap={peerNameMap}
+            activeSpeakerClientId={activeSpeakerClientId}
+            loadingProducers={loadingProducers}
+            broadcastSet={broadcastSet}
+            hostBroadcast={hostBroadcast}
+            hostStopBroadcast={hostStopBroadcast}
+            isHost={isHost}
+            remoteGridRef={remoteGridRef}
+            toggleRemoteFullscreen={toggleRemoteFullscreen}
+            isRemoteFullscreen={isRemoteFullscreen}
+            getGridColumns={getGridColumns}
+          />
         </div>
       </Box>
     </>
