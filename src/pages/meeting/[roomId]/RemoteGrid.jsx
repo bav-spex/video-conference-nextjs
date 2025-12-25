@@ -17,7 +17,11 @@ const RemoteGrid = ({
   remoteGridRef,
   toggleRemoteFullscreen,
   isRemoteFullscreen,
-  getGridColumns
+  getGridColumns,
+  // new callbacks passed from Meeting
+  onPromoteClick,
+  onDemoteClick,
+  onCapProducerClick
 }) => {
   return (
     <div style={{ flex: 1, minWidth: 320 }}>
@@ -61,6 +65,9 @@ const RemoteGrid = ({
             hostBroadcast={hostBroadcast}
             hostStopBroadcast={hostStopBroadcast}
             isHost={isHost}
+            onPromoteClick={onPromoteClick}
+            onDemoteClick={onDemoteClick}
+            onCapProducerClick={onCapProducerClick}
           />
         ))}
       </div>
