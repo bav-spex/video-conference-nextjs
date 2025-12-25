@@ -47,6 +47,7 @@ const Meeting = () => {
   const [remoteMedia, setRemoteMedia] = useState([]) // [{producerId, owner, stream}]
   const [loadingProducers, setLoadingProducers] = useState(new Set())
   const consumersRef = useRef(new Map()) // consumerId -> consumer
+  const consumerIdMapRef = useRef(new Map()) // producerId -> consumerId (for this client)
 
   // peers & producers metadata
   const [peers, setPeers] = useState([])
@@ -271,7 +272,7 @@ const Meeting = () => {
     if (!document.fullscreenElement) {
       el.requestFullscreen?.().catch(() => {}) // ignore errors for brevity
     } else {
-      document.exitFullscreen?.().catch(() => {})
+      document.exitFullscreen?.catch(() => {})
     }
   }
 
@@ -383,11 +384,42 @@ const Meeting = () => {
         localVideoRef.current.muted = true
       }
 
+      // Use simulcast encodings for video (three spatial layers)
+      // inside startCamera() after getting videoTrack from getUserMedia
+      const encodings = [
+        { maxBitrate: 150_000, scaleResolutionDownBy: 4 }, // low
+        { maxBitrate: 500_000, scaleResolutionDownBy: 2 }, // med
+        { maxBitrate: 1_500_000, scaleResolutionDownBy: 1 } // high
+      ]
+
       if (videoProducerRef.current) {
-        await videoProducerRef.current.replaceTrack({ track: videoTrack })
+        // If existing producer already has simulcast encodings -> just replaceTrack
+        const existingRtpParams = videoProducerRef.current.rtpParameters || {}
+        const existingEncodings = existingRtpParams.encodings || []
+
+        if (existingEncodings.length >= 2) {
+          // already simulcast-capable, just replace track
+          await videoProducerRef.current.replaceTrack({ track: videoTrack })
+        } else {
+          // existing producer is single-layer: close it and create a new simulcast producer
+          try {
+            await videoProducerRef.current.close()
+          } catch (e) {
+            console.warn('Error closing existing producer', e)
+          }
+          // create new producer with encodings
+          videoProducerRef.current = await sendTransportRef.current.produce({
+            track: videoTrack,
+            encodings,
+            codecOptions: { videoGoogleStartBitrate: 1000 }
+          })
+        }
       } else {
+        // no existing producer: create with simulcast encodings
         videoProducerRef.current = await sendTransportRef.current.produce({
-          track: videoTrack
+          track: videoTrack,
+          encodings,
+          codecOptions: { videoGoogleStartBitrate: 1000 }
         })
       }
 
@@ -423,11 +455,15 @@ const Meeting = () => {
 
     // DO NOT close producers → just remove their track
     if (videoProducerRef.current) {
-      videoProducerRef.current.replaceTrack({ track: null })
+      try {
+        videoProducerRef.current.replaceTrack({ track: null })
+      } catch (e) {}
     }
 
     if (audioProducerRef.current) {
-      audioProducerRef.current.replaceTrack({ track: null })
+      try {
+        audioProducerRef.current.replaceTrack({ track: null })
+      } catch (e) {}
     }
 
     if (localVideoRef.current) {
@@ -440,13 +476,17 @@ const Meeting = () => {
   function stopCamera() {
     // stop ONLY video track
     if (videoTrackRef.current) {
-      videoTrackRef.current.stop()
+      try {
+        videoTrackRef.current.stop()
+      } catch (e) {}
       videoTrackRef.current = null
     }
 
     // detach video from producer (producer stays alive)
     if (videoProducerRef.current) {
-      videoProducerRef.current.replaceTrack({ track: null })
+      try {
+        videoProducerRef.current.replaceTrack({ track: null })
+      } catch (e) {}
     }
 
     // update local preview
@@ -486,6 +526,7 @@ const Meeting = () => {
       } catch (_) {}
     }
     consumersRef.current.clear()
+    consumerIdMapRef.current.clear()
 
     setRemoteMedia(prev => {
       prev.forEach(m => {
@@ -512,6 +553,9 @@ const Meeting = () => {
         consumersRef.current.delete(cid)
       }
     }
+
+    // remove mapping
+    consumerIdMapRef.current.delete(producerId)
 
     // remove from remoteMedia
     setRemoteMedia(prev => {
@@ -541,6 +585,45 @@ const Meeting = () => {
         ctx.resume().catch(() => {})
       }
     })
+  }
+
+  // Monitor a consumer and auto-adapt layers when packet loss is high
+  function monitorConsumerAndAutoAdapt(consumer) {
+    let adaptInterval = setInterval(async () => {
+      try {
+        const statsMap = await consumer.getStats()
+        // statsMap is a Map-like object. Iterate its values.
+        let inbound = null
+        for (const stat of statsMap.values ? statsMap.values() : Object.values(statsMap)) {
+          if (stat && (stat.type === 'inbound-rtp' || stat.type === 'inboundrtp')) {
+            inbound = stat
+            break
+          }
+        }
+        if (!inbound) return
+        const packetsLost = inbound.packetsLost || 0
+        const packetsReceived = inbound.packetsReceived || 0
+        const lossRatio = packetsLost / Math.max(1, packetsLost + packetsReceived)
+        // if loss > 5% ask for lower layer
+        if (lossRatio > 0.05) {
+          try {
+            // find producerId from consumer.appData
+            const pid = consumer.appData && consumer.appData.producerId
+            if (pid) {
+              // request lowest spatial layer
+              requestConsumerLayer(roomId, consumer.id, 0, 2)
+            }
+          } catch (e) {
+            // ignore
+          }
+        }
+      } catch (e) {
+        // ignore monitor errors
+      }
+    }, 3000)
+
+    // return cleanup fn
+    return () => clearInterval(adaptInterval)
   }
 
   function consumeProducer(producerId, ownerClientId, s = socket) {
@@ -586,6 +669,7 @@ const Meeting = () => {
 
           consumer.appData = { producerId: res.producerId }
           consumersRef.current.set(consumer.id, consumer)
+          consumerIdMapRef.current.set(res.producerId, consumer.id)
 
           const stream = new MediaStream()
           stream.addTrack(consumer.track)
@@ -645,6 +729,12 @@ const Meeting = () => {
               return [...prev, { producerId: res.producerId, owner: ownerClientId, stream }]
             })
 
+            // start a per-consumer monitoring to auto-adapt
+            const cleanupMonitor = monitorConsumerAndAutoAdapt(consumer)
+            // store cleanup on consumer (so when closed we can clear)
+            consumer.on('transportclose', () => cleanupMonitor && cleanupMonitor())
+            consumer.on('producerclose', () => cleanupMonitor && cleanupMonitor())
+
             setLoadingProducers(prev => {
               const copy = new Set(prev)
               copy.delete(producerId)
@@ -682,6 +772,54 @@ const Meeting = () => {
       if (res && res.error) return toast.error(res.error)
       toast.success('Broadcast stopped')
     })
+  }
+
+  // ---------- Layer control helpers ----------
+  // Ask server to set preferred layers for a consumer (this affects the server->client consumer)
+  function requestConsumerLayer(roomIdArg, consumerId, spatialLayer, temporalLayer = 2) {
+    if (!socket) return
+    socket.emit('setConsumerLayers', { roomId: roomIdArg, consumerId, spatialLayer, temporalLayer }, res => {
+      if (res && res.error) {
+        console.warn('setConsumerLayers error', res.error)
+      } else {
+        // console.log('setConsumerLayers ok')
+      }
+    })
+  }
+
+  // Ask server to cap a producer's max spatial layer (server will call producer.setMaxSpatialLayer)
+  function setProducerMaxSpatialLayer(roomIdArg, producerId, maxSpatialLayer) {
+    if (!socket) return
+    socket.emit('setProducerMaxSpatialLayer', { roomId: roomIdArg, producerId, maxSpatialLayer }, res => {
+      if (res && res.error) {
+        toast.error('Failed to set producer maxSpatialLayer: ' + res.error)
+      } else {
+        toast.success('Producer maxSpatialLayer updated')
+      }
+    })
+  }
+
+  // UI-level helpers passed to tiles
+  function promoteProducerToHD(producerId) {
+    const consumerId = consumerIdMapRef.current.get(producerId)
+    if (!consumerId) {
+      toast.error('No consumer for that producer on this client')
+
+      return
+    }
+    // request HD spatial layer (2)
+    requestConsumerLayer(roomId, consumerId, 2, 2)
+  }
+
+  function demoteProducerToLow(producerId) {
+    const consumerId = consumerIdMapRef.current.get(producerId)
+    if (!consumerId) {
+      toast.error('No consumer for that producer on this client')
+
+      return
+    }
+    // request low spatial layer (0)
+    requestConsumerLayer(roomId, consumerId, 0, 2)
   }
 
   // ---------- render ----------
@@ -761,6 +899,11 @@ const Meeting = () => {
             toggleRemoteFullscreen={toggleRemoteFullscreen}
             isRemoteFullscreen={isRemoteFullscreen}
             getGridColumns={getGridColumns}
+            onPromoteClick={promoteProducerToHD}
+            onDemoteClick={demoteProducerToLow}
+            onCapProducerClick={(producerId, maxSpatialLayer) =>
+              setProducerMaxSpatialLayer(roomId, producerId, maxSpatialLayer)
+            }
           />
         </div>
       </Box>

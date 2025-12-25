@@ -3,7 +3,19 @@ import React from 'react'
 
 import { Button } from '@mui/material'
 
-const Tile = ({ m, peerNameMap, activeSpeakerClientId, loadingProducers, broadcastSet, hostBroadcast, hostStopBroadcast, isHost }) => {
+const Tile = ({
+  m,
+  peerNameMap,
+  activeSpeakerClientId,
+  loadingProducers,
+  broadcastSet,
+  hostBroadcast,
+  hostStopBroadcast,
+  isHost,
+  onPromoteClick, // (producerId) => promote to HD for this client (calls setConsumerLayers)
+  onDemoteClick, // (producerId) => demote to low
+  onCapProducerClick // (producerId, maxSpatialLayer) => server setProducerMaxSpatialLayer
+}) => {
   const isActive = activeSpeakerClientId === m.owner
 
   return (
@@ -74,8 +86,50 @@ const Tile = ({ m, peerNameMap, activeSpeakerClientId, loadingProducers, broadca
               Broadcast
             </Button>
           )}
+          {/* Host: cap producer (e.g., force maxSpatialLayer=1 to prevent HD) */}
+          <Button
+            size='small'
+            style={{ padding: '4px 10px', fontSize: 12 }}
+            onClick={() => onCapProducerClick && onCapProducerClick(m.producerId, 1)}
+          >
+            Cap to SD
+          </Button>
+          <Button
+            size='small'
+            style={{ padding: '4px 10px', fontSize: 12 }}
+            onClick={() => onCapProducerClick && onCapProducerClick(m.producerId, 2)}
+          >
+            Allow HD
+          </Button>
         </div>
       )}
+
+      {/* Promote / Demote buttons for attendee or host to request a change for their own UI */}
+      <div
+        style={{
+          position: 'absolute',
+          top: 6,
+          right: 6,
+          display: 'flex',
+          gap: 8,
+          zIndex: 6
+        }}
+      >
+        <Button
+          size='small'
+          style={{ padding: '6px 8px', fontSize: 12 }}
+          onClick={() => onPromoteClick && onPromoteClick(m.producerId)}
+        >
+          Promote HD
+        </Button>
+        <Button
+          size='small'
+          style={{ padding: '6px 8px', fontSize: 12 }}
+          onClick={() => onDemoteClick && onDemoteClick(m.producerId)}
+        >
+          Lower Quality
+        </Button>
+      </div>
 
       {/* Loading overlay */}
       {loadingProducers.has(m.producerId) && (
